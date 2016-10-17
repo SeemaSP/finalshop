@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.views.generic.base import View
 from django.shortcuts import render,get_object_or_404,redirect
 
-from shop.models import Country,State,City,Category,Product,OrderItem,User,Address,Coupon
+from shop.models import Country,State,City,Category,Product,OrderItem,User,Address,Coupon,Payment,Order
 
 
 
@@ -29,10 +29,9 @@ from django.template.response import TemplateResponse
 from django.conf import settings
 
 
-from shop.forms import OrderCreateForm,CustomUserRegistrationForm,CouponApplyForm
-from cart.forms import CartAddProductForm
+from shop.forms import OrderCreateForm,CustomUserRegistrationForm,CouponApplyForm,PaymentDetails,CartAddProductForm
 from django.views.decorators.http import require_POST
-from cart.cart import Cart
+from .cart import Cart
 from django.utils import timezone
 
 class Getstates(View):
@@ -241,23 +240,35 @@ def logout(request, next_page=None,
 
     return TemplateResponse(request, template_name, context)
 
+
 def order_create(request):
     cart = Cart(request) 
     if request.method == 'POST':
-        form = OrderCreateForm(request.POST)
+        form = OrderCreateForm(request.POST,user = request.user)
         if form.is_valid():
-            order = form.save(commit = False)
-            if cart.coupon:
-                order.coupon = cart.coupon
-                order.discount = cart.coupon.discount
-            order.save()
-            for item in cart:
-                OrderItem.objects.create(order = order,product = item['product'],price=item['price'],quantity = item['quantity'])
-            #clear the cart
-            cart.clear()	
-            return render(request,'orders/order/created.html',{'order':order})
+            #order = form.save(commit = False)
+            #order.user=request.user
+            #order.shipping_address = Address.objects.get(user=request.user)
+            # if cart.coupon:
+                # order.coupon = cart.coupon
+                # order.discount = cart.coupon.discount
+            # order.save()
+            # for item in cart:
+                # OrderItem.objects.create(order = order,product = item['product'],price=item['price'],quantity = item['quantity'])
+            # #clear the cart
+            # cart.clear()
+            # #some payment functionality might come here		
+            #request.session['order_id']=order.id #request the order id
+            request.session['order_form_stuff'] = form.cleaned_data
+            request.session['post_request_data'] = request.POST
+            print('############ in order create ###############')
+            #request.session['order_object_holder'] = order
+            #request.session['current_cart_holder'] = cart
+            print('##############order object put in session ####################')
+            return redirect(reverse('shop:process'))#redirect to the view for processing the payment			
+            #return render(request,'orders/order/created.html',{'order':order})            
     else:
-        form = OrderCreateForm()
+        form = OrderCreateForm(user = request.user)
     return render(request,'orders/order/create.html',{'cart':cart,'form':form})	
 
 def registration_view(request):
@@ -305,4 +316,102 @@ def coupon_apply(request):
             request.session['coupon_id']=coupon.id
         except Coupon.DoesNotExist:
             request.session['coupon_id']=None 
-    return redirect('cart:cart_detail')   
+    return redirect('shop:cart_detail')   
+
+'''this is just a test view to check if 
+it would redirect to the payment details template'''
+	
+def payment_process(request):
+    cart = Cart(request) 
+    if request.method == 'POST':
+        print(request.POST)
+        form1 = PaymentDetails(request.POST)
+		
+        print(request.POST.get('account_number'))
+        payment_meta_info = {}
+        print('########got post request#########33')
+        if form1.is_valid():
+            print('########form now valid#########33')
+            account_number = form1.cleaned_data['account_number']
+            csv_number = form1.cleaned_data['cvv_number']
+            code = form1.cleaned_data['code']
+            payment_meta_info['account_number']=account_number
+            payment_meta_info['cvv_number']=csv_number
+            payment_meta_info['code']=code          
+            payment_type = form1.cleaned_data['payment_type']
+            print('##########before getting order id from session ##############')
+            #order_id = request.session.get('order_id')
+            print('##########after getting order id from session ##############')
+            print('##########before getting order form from request from session ##############')
+            order_form = request.session.get('order_form_stuff')
+            print(order_form)
+            
+            form = OrderCreateForm(order_form,user = request.user)
+            print(form)
+            order = form.save(commit = False)
+            print(order)
+            order.user = request.user
+            print(order.user)
+            order.shipping_address = Address.objects.get(user=request.user)
+            if cart.coupon:
+                order.coupon = cart.coupon
+                order.discount = cart.coupon.discount
+            order.save()
+            for item in cart:
+                OrderItem.objects.create(order = order,product = item['product'],price=item['price'],quantity = item['quantity'])
+            #clear the cart
+            #cart.clear()
+            
+            post_request_data = request.session.get('post_request_data')
+            print(post_request_data)
+            #order = order_form.save(commit = False)
+            print('##########after saving order obtained from session ##############')
+            #order = request.session.get('order_object_holder')
+            #cart = request.session.get('current_cart_holder') 
+            #order = get_object_or_404(Order,id=order_id)
+            total_payment_amount = order.get_total_cost()
+            #order_number = str(order.id)
+            order.paid = True
+            print('#########payment status saved#################')
+            # if cart.coupon:
+                # order.coupon = cart.coupon
+                # order.discount = cart.coupon.discount
+            order.save()
+            # for item in cart:
+                # OrderItem.objects.create(order = order,product = item['product'],price=item['price'],quantity = item['quantity'])
+            #clear the cart
+            #cart.clear()
+            #order.save()
+            #print(order.id)
+            payment = Payment(total_amount=total_payment_amount,payment_type=payment_type,payment_meta_info=payment_meta_info,order=order)
+            payment.save()
+            cart.clear()
+            return render(request,'orders/order/created.html',{'order':order})
+    else:
+        form1 = PaymentDetails()
+    return render(request,'payment/payment_details.html',{'form':form1})    			
+    
+
+@require_POST
+def cart_add(request,product_id):
+    cart = Cart(request)
+    product = get_object_or_404(Product,id = product_id)
+    form = CartAddProductForm(request.POST)
+    if form.is_valid():
+        cd = form.cleaned_data
+        cart.add(product = product,quantity = cd['quantity'], update_quantity = cd['update'])
+        return redirect('shop:cart_detail')
+
+def cart_remove(request,product_id):
+    cart = Cart(request)
+    product = get_object_or_404(Product,id = product_id)
+    cart.remove(product)
+    return redirect('shop:cart_detail')
+
+def cart_detail(request):
+    cart = Cart(request)
+    for item in cart:
+        item['update_quantity_form'] = CartAddProductForm(initial = {'quantity':item['quantity'],'update':True})
+    coupon_apply_form = CouponApplyForm()
+    return render(request,'cart/detail.html',{'cart':cart,'coupon_apply_form':coupon_apply_form})
+	

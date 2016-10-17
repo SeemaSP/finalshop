@@ -32,7 +32,6 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     'shop',
-    'cart',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -68,7 +67,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'cart.context_processors.cart',
+                'shop.context_processors.cart',
             ],
         },
     },
@@ -138,3 +137,5 @@ MEDIA_ROOT = os.path.join(BASE_DIR,'media/')
 CART_SESSION_ID = 'cart'
 
 LOGIN_REDIRECT_URL = '/admin'
+LOGOUT_URL = '/'
+LOGOUT_REDIRECT_URL='/'

@@ -24,7 +24,6 @@ urlpatterns = [
     url(r'^admin/login',login,name='login' ),
     url(r'^logout/',logout ,name='logout'),#login is the custom view..
     url(r'^admin/', admin.site.urls),
-    url(r'^cart/',include('cart.urls',namespace = 'cart')),
     url(r'', include('shop.urls',namespace='shop')),
     url(r'^jsreverse/$', urls_js, name='js_reverse'),
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

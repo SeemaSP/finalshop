@@ -234,3 +234,18 @@ class OrderItem(models.Model):
     def get_cost(self):
         return self.price * self.quantity
  
+
+class Payment(models.Model):
+    PAYMENT_METHODS = (('D','Debit'),('C','Credit'))
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'),validators=[MinValueValidator(Decimal('0.00'))])
+    payment_type = models.CharField(max_length = 1, choices = PAYMENT_METHODS)
+    order = models.ForeignKey(Order,related_name = 'ordergets') 
+    payment_meta_info = models.TextField()
+    created = models.DateTimeField(auto_now_add = True)
+    def __str__(self):
+        return 'Payment {0}{1}{2}{3}'.format(self.total_amount,self.payment_type,self.order,self.order.user.first_name)
+    # def clean_payment_meta_info(self):
+        # if self.instance.is_disabled:
+            # return self.instance.payment_meta_info
+        # else:
+            # return self.cleaned_data.get('payment_meta_info')

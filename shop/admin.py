@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User,Category,Product,Address,Country,City,State,Order,OrderItem,Coupon
+from .models import User,Category,Product,Address,Country,City,State,Order,OrderItem,Coupon,Payment
 # Register your models here.
 from .forms import UserPasswordFixForm
 #'last_login',
@@ -124,3 +124,9 @@ class CouponAdmin(admin.ModelAdmin):
     search_fields = ['code']
 
 admin.site.register(Coupon, CouponAdmin)
+
+class PaymentAdmin(admin.ModelAdmin):
+    model = Payment
+    readonly_fields = ('payment_meta_info',)
+
+admin.site.register(Payment)
